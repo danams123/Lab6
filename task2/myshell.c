@@ -15,10 +15,18 @@ void execute(cmdLine *pCmdLine, int debug)
 {
     int returnVal;
     int err = 0;
-    pid_t pid = 0;
+    pid_t pid;
+    pid_t pid2;
     int status;
     int fd_in;
     int fd_out;
+    int pipefd[2];
+    int pipeline = 0;
+
+    if (pCmdLine->next != NULL)
+    {
+        pipeline = 1;
+    }
 
     if (strncmp(pCmdLine->arguments[0], "cd", 2) == 0)
     {
@@ -36,9 +44,22 @@ void execute(cmdLine *pCmdLine, int debug)
             fflush(stderr);
         }
     }
-
+    if (pipeline)
+    {
+        if (pipe(pipefd) == -1)
+        {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
     else if ((pid = fork()) == 0)
     {
+        if (pipeline)
+        {
+            close(STDOUT_FILENO);
+            dup(pipefd[1]);
+            close(pipefd[1]);
+        }
         if (pCmdLine->inputRedirect != NULL)
         {
             fd_in = open(pCmdLine->inputRedirect, O_RDONLY);
@@ -60,6 +81,30 @@ void execute(cmdLine *pCmdLine, int debug)
             _exit(EXECUTION_FAILED);
         }
     }
+    else if (pipeline && pid != 0)
+    {
+        close(pipefd[1]);
+        if ((pid2 = fork()) == 0)
+        {
+            close(STDIN_FILENO);
+            dup(pipefd[0]);
+            close(pipefd[0]);
+            if ((returnVal = execv(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
+            {
+                perror("couln't execute");
+                _exit(EXECUTION_FAILED);
+            }
+        }
+        // else if (pid2 == -1)
+        // {
+        //     perror("fork");
+        //     exit(EXIT_FAILURE);
+        // }
+        else
+        {
+            close(pipefd[0]);
+        }
+    }
 
     if (debug == 1)
     {
@@ -69,6 +114,8 @@ void execute(cmdLine *pCmdLine, int debug)
     if (pCmdLine->blocking == 1)
     {
         waitpid(pid, &status, 0);
+        if (pipeline)
+            waitpid(pid2, &status, 0);
     }
 }
 
