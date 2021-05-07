@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define INPUT_MAX_SIZE 48
 #define EXECUTION_FAILED 1
@@ -16,6 +17,8 @@ void execute(cmdLine *pCmdLine, int debug)
     int err = 0;
     pid_t pid = 0;
     int status;
+    int fd_in;
+    int fd_out;
 
     if (strncmp(pCmdLine->arguments[0], "cd", 2) == 0)
     {
@@ -36,6 +39,20 @@ void execute(cmdLine *pCmdLine, int debug)
 
     else if ((pid = fork()) == 0)
     {
+        if (pCmdLine->inputRedirect != NULL)
+        {
+            fd_in = open(pCmdLine->inputRedirect, O_RDONLY);
+            close(0);
+            dup(fd_in);
+            close(fd_in);
+        }
+        if (pCmdLine->outputRedirect != NULL)
+        {
+            fd_out = creat(pCmdLine->outputRedirect, 0644);
+            close(1);
+            dup(fd_out);
+            close(fd_out);
+        }
         if ((returnVal = execv(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
         {
             perror("couln't execute");
