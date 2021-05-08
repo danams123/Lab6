@@ -53,7 +53,7 @@ void execute(cmdLine *pCmdLine, int debug)
             dup(fd_out);
             close(fd_out);
         }
-        if ((returnVal = execv(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
+        if ((returnVal = execvp(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
         {
             perror("couln't execute");
             freeCmdLines(pCmdLine);

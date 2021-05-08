@@ -74,7 +74,7 @@ void execute(cmdLine *pCmdLine, int debug)
             dup(fd_out);
             close(fd_out);
         }
-        if ((returnVal = execv(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
+        if ((returnVal = execvp(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
         {
             perror("couln't execute");
             freeCmdLines(pCmdLine);
@@ -89,7 +89,7 @@ void execute(cmdLine *pCmdLine, int debug)
             close(STDIN_FILENO);
             dup(pipefd[0]);
             close(pipefd[0]);
-            if ((returnVal = execv(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
+            if ((returnVal = execvp(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
             {
                 perror("couln't execute");
                 _exit(EXECUTION_FAILED);

@@ -11,8 +11,8 @@
 
 int main(int argc, char **argv)
 {
-    char *input1[] = {"/bin/ls", "-l", 0};
-    char *input2[] = {"/bin/tail", "-n", "2", 0};
+    char *input1[] = {"ls", "-l", 0};
+    char *input2[] = {"tail", "-n", "2", 0};
     int debug = 0;
     int returnVal;
     pid_t pid1 = 0;
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
             fflush(stderr);
         }
 
-        if ((returnVal = execv(input1[0], input1)) < 0)
+        if ((returnVal = execvp(input1[0], input1)) < 0)
         {
             perror("couln't execute");
             _exit(EXECUTION_FAILED);
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "(child2>going to execute cmd: …)");
                 fflush(stderr);
             }
-            if ((returnVal = execv(input2[0], input2)) < 0)
+            if ((returnVal = execvp(input2[0], input2)) < 0)
             {
                 perror("couln't execute");
                 _exit(EXECUTION_FAILED);
