@@ -25,15 +25,14 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
 {
     int returnVal;
     int err = 0;
-    pid_t pid;
-    pid_t pid2;
+    pid_t pid = 0;
+    pid_t pid2 = 0;
     int i;
     int status;
     int fd_in;
     int fd_out;
     int pipefd[2];
     int pipeline = 0;
-    int num;
 
     if (pCmdLine->next != NULL)
     {
@@ -55,6 +54,12 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
             fprintf(stderr, "no such directory\n");
             fflush(stderr);
         }
+
+        if (debug == 1)
+        {
+            fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", getpid(), pCmdLine->arguments[0]);
+            fflush(stderr);
+        }
         return;
     }
     else if (strncmp(pCmdLine->arguments[0], "history", 8) == 0)
@@ -63,15 +68,15 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
         {
             printf("%d) %s\n", i, history[i]);
         }
+
+        if (debug == 1)
+        {
+            fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", getpid(), pCmdLine->arguments[0]);
+            fflush(stderr);
+        }
         return;
     }
-    else if (strncmp(pCmdLine->arguments[0], "!", 1) == 0)
-    {
-        num = atoi((pCmdLine->arguments[0]) + 1);
-        freeCmdLines(pCmdLine);
-        pCmdLine = parseCmdLines(history[num]);
-        printf("%s", pCmdLine->arguments[0]);
-    }
+
     if (pipeline)
     {
         if (pipe(pipefd) == -1)
@@ -106,9 +111,10 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
         }
         if ((returnVal = execvp(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
         {
-            perror("couln't execute");
+            perror("couldn't execute");
             freeCmdLines(pCmdLine);
             freeHistory(history, counter);
+
             _exit(EXECUTION_FAILED);
         }
     }
@@ -120,9 +126,23 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
             close(STDIN_FILENO);
             dup(pipefd[0]);
             close(pipefd[0]);
+            if (pCmdLine->next->inputRedirect != NULL)
+            {
+                fd_in = open(pCmdLine->next->inputRedirect, O_RDONLY);
+                close(0);
+                dup(fd_in);
+                close(fd_in);
+            }
+            if (pCmdLine->next->outputRedirect != NULL)
+            {
+                fd_out = creat(pCmdLine->next->outputRedirect, 0644);
+                close(1);
+                dup(fd_out);
+                close(fd_out);
+            }
             if ((returnVal = execvp(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
             {
-                perror("couln't execute");
+                perror("couldn't execute");
                 freeCmdLines(pCmdLine);
                 freeHistory(history, counter);
                 _exit(EXECUTION_FAILED);
@@ -134,27 +154,30 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
         }
     }
 
-    if (debug == 1)
-    {
-        fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", pid, pCmdLine->arguments[0]);
-        fflush(stderr);
-    }
     if (pCmdLine->blocking == 1)
     {
         waitpid(pid, &status, 0);
         if (pipeline)
             waitpid(pid2, &status, 0);
     }
+
+    if (debug == 1)
+    {
+        fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", pid, pCmdLine->arguments[0]);
+        fflush(stderr);
+    }
 }
 
 int main(int argc, char **argv)
 {
     char buf[PATH_MAX];
+    char *input;
     char **history = (char **)malloc(sizeof(char *) * HISTORY_SIZE);
     cmdLine *cmdL;
     int i;
     int counter = 0;
     int debug = 0;
+    int num;
 
     for (i = 0; i < argc; i++)
     {
@@ -188,24 +211,44 @@ int main(int argc, char **argv)
 
         fgets(history[counter], INPUT_MAX_SIZE, stdin);
 
-        if (strncmp(history[counter], "quit", 4) == 0)
+        input = strdup(history[counter]);
+
+        if (strncmp(history[counter], "!", 1) == 0)
+        {
+            num = atoi((history[counter]) + 1);
+            free(input);
+            if (num > counter)
+            {
+                perror("Index out of range");
+                continue;
+            }
+            else
+            {
+                input = strdup(history[num]);
+            }
+        }
+
+        else if (strncmp(history[counter], "quit", 4) == 0)
         {
             if (counter != 10)
                 counter = counter + 1;
+            free(input);
             break;
         }
 
-        if ((cmdL = parseCmdLines(history[counter])) == NULL)
+        if ((cmdL = parseCmdLines(input)) == NULL)
         {
             fprintf(stdout, "%s", "nothing to parse\n");
             if (counter != 10)
                 counter = counter + 1;
+            free(input);
             break;
         }
 
         if (counter != 10)
             counter = counter + 1;
 
+        free(input);
         execute(cmdL, debug, history, counter);
         freeCmdLines(cmdL);
     }

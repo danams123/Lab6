@@ -15,8 +15,8 @@ void execute(cmdLine *pCmdLine, int debug)
 {
     int returnVal;
     int err = 0;
-    pid_t pid;
-    pid_t pid2;
+    pid_t pid = 0;
+    pid_t pid2 = 0;
     int status;
     int fd_in;
     int fd_out;
@@ -43,6 +43,11 @@ void execute(cmdLine *pCmdLine, int debug)
             fprintf(stderr, "no such directory\n");
             fflush(stderr);
         }
+        if (debug == 1)
+        {
+            fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", getpid(), pCmdLine->arguments[0]);
+            fflush(stderr);
+        }
         return;
     }
     if (pipeline)
@@ -50,7 +55,7 @@ void execute(cmdLine *pCmdLine, int debug)
         if (pipe(pipefd) == -1)
         {
             perror("pipe");
-            freeCmdLines(pCmdLine); //here
+            freeCmdLines(pCmdLine);
             exit(EXIT_FAILURE);
         }
     }
@@ -78,11 +83,11 @@ void execute(cmdLine *pCmdLine, int debug)
         }
         if ((returnVal = execvp(pCmdLine->arguments[0], pCmdLine->arguments)) < 0)
         {
-            perror("couln't execute");
+            perror("couldn't execute");
             freeCmdLines(pCmdLine);
             _exit(EXECUTION_FAILED);
         }
-        freeCmdLines(pCmdLine); //here
+        freeCmdLines(pCmdLine);
     }
     else if (pipeline && pid != 0)
     {
@@ -92,25 +97,38 @@ void execute(cmdLine *pCmdLine, int debug)
             close(STDIN_FILENO);
             dup(pipefd[0]);
             close(pipefd[0]);
+            if (pCmdLine->next->inputRedirect != NULL)
+            {
+                fd_in = open(pCmdLine->next->inputRedirect, O_RDONLY);
+                close(0);
+                dup(fd_in);
+                close(fd_in);
+            }
+            if (pCmdLine->next->outputRedirect != NULL)
+            {
+                fd_out = creat(pCmdLine->next->outputRedirect, 0644);
+                close(1);
+                dup(fd_out);
+                close(fd_out);
+            }
             if ((returnVal = execvp(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
             {
-                perror("couln't execute");
-                freeCmdLines(pCmdLine); //here
+                perror("couldn't execute");
+                freeCmdLines(pCmdLine);
                 _exit(EXECUTION_FAILED);
             }
-            freeCmdLines(pCmdLine); //here
         }
         else
         {
             close(pipefd[0]);
         }
+        if (debug == 1)
+        {
+            fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", pid, pCmdLine->arguments[0]);
+            fflush(stderr);
+        }
     }
 
-    if (debug == 1)
-    {
-        fprintf(stderr, "pid is: %d\nExecuting command is: %s\n", pid, pCmdLine->arguments[0]);
-        fflush(stderr);
-    }
     if (pCmdLine->blocking == 1)
     {
         waitpid(pid, &status, 0);
