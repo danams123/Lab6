@@ -28,7 +28,7 @@ void execute(cmdLine *pCmdLine, int debug)
         pipeline = 1;
     }
 
-    if (strncmp(pCmdLine->arguments[0], "cd", 2) == 0)
+    if (strncmp(pCmdLine->arguments[0], "cd", 2) == 0 && pCmdLine->argCount > 1)
     {
         if (strncmp(pCmdLine->arguments[1], "..", 2) == 0)
         {
@@ -43,16 +43,18 @@ void execute(cmdLine *pCmdLine, int debug)
             fprintf(stderr, "no such directory\n");
             fflush(stderr);
         }
+        return;
     }
     if (pipeline)
     {
         if (pipe(pipefd) == -1)
         {
             perror("pipe");
+            freeCmdLines(pCmdLine); //here
             exit(EXIT_FAILURE);
         }
     }
-    else if ((pid = fork()) == 0)
+    if ((pid = fork()) == 0)
     {
         if (pipeline)
         {
@@ -80,6 +82,7 @@ void execute(cmdLine *pCmdLine, int debug)
             freeCmdLines(pCmdLine);
             _exit(EXECUTION_FAILED);
         }
+        freeCmdLines(pCmdLine); //here
     }
     else if (pipeline && pid != 0)
     {
@@ -92,14 +95,11 @@ void execute(cmdLine *pCmdLine, int debug)
             if ((returnVal = execvp(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
             {
                 perror("couln't execute");
+                freeCmdLines(pCmdLine); //here
                 _exit(EXECUTION_FAILED);
             }
+            freeCmdLines(pCmdLine); //here
         }
-        // else if (pid2 == -1)
-        // {
-        //     perror("fork");
-        //     exit(EXIT_FAILURE);
-        // }
         else
         {
             close(pipefd[0]);
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
             break;
         }
         execute(cmdL, debug);
+        freeCmdLines(cmdL);
     }
-    freeCmdLines(cmdL);
     return 0;
 }

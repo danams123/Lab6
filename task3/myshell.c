@@ -11,6 +11,16 @@
 #define EXECUTION_FAILED 1
 #define HISTORY_SIZE 10
 
+void freeHistory(char *history[], int counter)
+{
+    int i;
+    for (i = 0; i < counter; i++)
+    {
+        free(history[i]);
+    }
+    free(history);
+}
+
 void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
 {
     int returnVal;
@@ -67,6 +77,8 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
         if (pipe(pipefd) == -1)
         {
             perror("pipe");
+            freeCmdLines(pCmdLine);
+            freeHistory(history, counter);
             exit(EXIT_FAILURE);
         }
     }
@@ -96,6 +108,7 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
         {
             perror("couln't execute");
             freeCmdLines(pCmdLine);
+            freeHistory(history, counter);
             _exit(EXECUTION_FAILED);
         }
     }
@@ -110,14 +123,11 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
             if ((returnVal = execvp(pCmdLine->next->arguments[0], pCmdLine->next->arguments)) < 0)
             {
                 perror("couln't execute");
+                freeCmdLines(pCmdLine);
+                freeHistory(history, counter);
                 _exit(EXECUTION_FAILED);
             }
         }
-        // else if (pid2 == -1)
-        // {
-        //     perror("fork");
-        //     exit(EXIT_FAILURE);
-        // }
         else
         {
             close(pipefd[0]);
@@ -140,8 +150,7 @@ void execute(cmdLine *pCmdLine, int debug, char *history[], int counter)
 int main(int argc, char **argv)
 {
     char buf[PATH_MAX];
-    char input[INPUT_MAX_SIZE];
-    char *history[HISTORY_SIZE];
+    char **history = (char **)malloc(sizeof(char *) * HISTORY_SIZE);
     cmdLine *cmdL;
     int i;
     int counter = 0;
@@ -158,6 +167,8 @@ int main(int argc, char **argv)
         char *returnVal = getcwd(buf, PATH_MAX);
         if (returnVal == NULL)
         {
+            if (counter != 10)
+                counter = counter + 1;
             break;
         }
 
@@ -172,18 +183,23 @@ int main(int argc, char **argv)
             }
             counter = counter - 1;
         }
-        history[counter] = (char *)malloc(sizeof(INPUT_MAX_SIZE));
+
+        history[counter] = (char *)malloc(INPUT_MAX_SIZE * sizeof(char));
 
         fgets(history[counter], INPUT_MAX_SIZE, stdin);
 
         if (strncmp(history[counter], "quit", 4) == 0)
         {
+            if (counter != 10)
+                counter = counter + 1;
             break;
         }
 
         if ((cmdL = parseCmdLines(history[counter])) == NULL)
         {
             fprintf(stdout, "%s", "nothing to parse\n");
+            if (counter != 10)
+                counter = counter + 1;
             break;
         }
 
@@ -191,11 +207,8 @@ int main(int argc, char **argv)
             counter = counter + 1;
 
         execute(cmdL, debug, history, counter);
+        freeCmdLines(cmdL);
     }
-    for (i = 0; i < counter; i++)
-    {
-        free(history[i]);
-    }
-    freeCmdLines(cmdL);
+    freeHistory(history, counter);
     return 0;
 }

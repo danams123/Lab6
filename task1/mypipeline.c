@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     {
         if (debug)
         {
-            fprintf(stderr, "(parent_process>created process with id: %d)", getpid());
+            fprintf(stderr, "(parent_process>created process with id: %d)", pid1);
             fprintf(stderr, "(parent_process>closing the write end of the pipe…)");
             fflush(stderr);
         }
